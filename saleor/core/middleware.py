@@ -1,50 +1,67 @@
 import logging
-from datetime import date
 
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.core.exceptions import MiddlewareNotUsed
+from django.utils import timezone
 from django.utils.functional import SimpleLazyObject
 from django.utils.translation import get_language
 from django_countries.fields import Country
 
+from ..discount.utils import fetch_discounts
+from ..plugins.manager import get_plugins_manager
 from . import analytics
-from ..discount.models import Sale
 from .utils import get_client_ip, get_country_by_ip, get_currency_for_country
-from .utils.taxes import get_taxes_for_country
 
 logger = logging.getLogger(__name__)
 
 
 def google_analytics(get_response):
     """Report a page view to Google Analytics."""
-    def middleware(request):
+
+    if not settings.GOOGLE_ANALYTICS_TRACKING_ID:
+        raise MiddlewareNotUsed()
+
+    def _google_analytics_middleware(request):
         client_id = analytics.get_client_id(request)
         path = request.path
         language = get_language()
         headers = request.META
         try:
             analytics.report_view(
-                client_id, path=path, language=language, headers=headers)
+                client_id, path=path, language=language, headers=headers
+            )
         except Exception:
-            logger.exception('Unable to update analytics')
+            logger.exception("Unable to update analytics")
         return get_response(request)
-    return middleware
+
+    return _google_analytics_middleware
+
+
+def request_time(get_response):
+    def _stamp_request(request):
+        request.request_time = timezone.now()
+        return get_response(request)
+
+    return _stamp_request
 
 
 def discounts(get_response):
     """Assign active discounts to `request.discounts`."""
-    def middleware(request):
-        discounts = Sale.objects.active(date.today()).prefetch_related(
-            'products', 'categories', 'collections')
-        request.discounts = discounts
+
+    def _discounts_middleware(request):
+        request.discounts = SimpleLazyObject(
+            lambda: fetch_discounts(request.request_time)
+        )
         return get_response(request)
 
-    return middleware
+    return _discounts_middleware
 
 
 def country(get_response):
     """Detect the user's country and assign it to `request.country`."""
-    def middleware(request):
+
+    def _country_middleware(request):
         client_ip = get_client_ip(request)
         if client_ip:
             request.country = get_country_by_ip(client_ip)
@@ -52,19 +69,20 @@ def country(get_response):
             request.country = Country(settings.DEFAULT_COUNTRY)
         return get_response(request)
 
-    return middleware
+    return _country_middleware
 
 
 def currency(get_response):
     """Take a country and assign a matching currency to `request.currency`."""
-    def middleware(request):
-        if hasattr(request, 'country') and request.country is not None:
+
+    def _currency_middleware(request):
+        if hasattr(request, "country") and request.country is not None:
             request.currency = get_currency_for_country(request.country)
         else:
             request.currency = settings.DEFAULT_CURRENCY
         return get_response(request)
 
-    return middleware
+    return _currency_middleware
 
 
 def site(get_response):
@@ -75,22 +93,26 @@ def site(get_response):
     required to restart all application servers in order to invalidate
     the cache. Using this middleware solves this problem.
     """
-    def middleware(request):
+
+    def _get_site():
         Site.objects.clear_cache()
-        request.site = Site.objects.get_current()
+        return Site.objects.get_current()
+
+    def _site_middleware(request):
+        request.site = SimpleLazyObject(_get_site)
         return get_response(request)
 
-    return middleware
+    return _site_middleware
 
 
-def taxes(get_response):
-    """Assign tax rates for default country to `request.taxes`."""
-    def middleware(request):
-        if settings.VATLAYER_ACCESS_KEY:
-            request.taxes = SimpleLazyObject(lambda: get_taxes_for_country(
-                request.country))
-        else:
-            request.taxes = None
+def plugins(get_response):
+    """Assign plugins manager."""
+
+    def _get_manager():
+        return get_plugins_manager(plugins=settings.PLUGINS)
+
+    def _plugins_middleware(request):
+        request.plugins = SimpleLazyObject(lambda: _get_manager())
         return get_response(request)
 
-    return middleware
+    return _plugins_middleware

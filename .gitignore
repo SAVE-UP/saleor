@@ -7,12 +7,14 @@
 !.dockerignore
 !.eslintrc.json
 !.flowconfig
-!.gqlconfig
 !.github
 !.gitignore
-!.nvmrc
+!.gqlconfig
 !.npmrc
+!.nvmrc
+!.plop
 !.pylintrc
+!.testcafe
 !.travis*
 !.tx
 *.css
@@ -26,11 +28,9 @@ coverage/
 dist/
 *\.egg*
 # data
-/docs/_build/
 /media/
 /node_modules/
 /static/
-/saleor/static/assets/
-webpack-bundle.json
-/templates/templated_email/compiled/*
-!/templates/templated_email/compiled/.gitkeep
+
+# Exported results file
+django-queries-results.html

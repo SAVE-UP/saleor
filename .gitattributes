@@ -1,5 +1,5 @@
 # Package manager lock files
-Pipfile.lock linguist-generated -diff -merge
+*.lock linguist-generated -diff -merge
 package-lock.json linguist-generated -diff -merge
 
 # Generated django migration files
@@ -13,6 +13,9 @@ package-lock.json linguist-generated -diff -merge
 
 # Precompiled emails templates
 *.mjml linguist-generated
+
+# Seeded isort known third parties
+.isort.cfg linguist-generated
 
 # Automatically resolve changelog conflicts
 CHANGELOG.md merge=union

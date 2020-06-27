@@ -1,13 +1,43 @@
-from saleor.product.filters import ProductCategoryFilter
+from unittest.mock import patch
+
+from saleor.product.models import Category
+from saleor.product.utils import collect_categories_tree_products, delete_categories
 
 
-def test_product_category_filter_filters_from_child_category(
-        product_type, categories_tree):
-    product_filter = ProductCategoryFilter(data={}, category=categories_tree)
-    (product_attributes, variant_attributes) = product_filter._get_attributes()
+def test_collect_categories_tree_products(categories_tree):
+    parent = categories_tree
+    child = parent.children.first()
+    products = parent.products.all() | child.products.all()
 
-    attribut = product_type.product_attributes.get()
-    variant = product_type.variant_attributes.get()
+    result = collect_categories_tree_products(parent)
 
-    assert attribut in product_attributes
-    assert variant in variant_attributes
+    assert len(result) == len(products)
+    assert set(result.values_list("pk", flat=True)) == set(
+        products.values_list("pk", flat=True)
+    )
+
+
+@patch("saleor.product.utils.update_products_minimal_variant_prices_task")
+def test_delete_categories(
+    mock_update_products_minimal_variant_prices_task,
+    categories_tree_with_published_products,
+):
+    parent = categories_tree_with_published_products
+    child = parent.children.first()
+    product_list = [child.products.first(), parent.products.first()]
+
+    delete_categories([parent.pk])
+
+    assert not Category.objects.filter(
+        id__in=[category.id for category in [parent, child]]
+    ).exists()
+
+    mock_update_products_minimal_variant_prices_task.delay.assert_called_once_with(
+        product_ids=[p.pk for p in product_list]
+    )
+
+    for product in product_list:
+        product.refresh_from_db()
+        assert not product.category
+        assert not product.is_published
+        assert not product.publication_date

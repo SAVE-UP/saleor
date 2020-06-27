@@ -1,4 +1,4 @@
-from django.utils.translation import npgettext
+from django.template.defaultfilters import pluralize
 from django_filters import FilterSet
 
 
@@ -14,7 +14,7 @@ class SortedFilterSet(FilterSet):
         super(SortedFilterSet, self).__init__(data, *args, **kwargs)
 
     def set_is_bound_unsorted(self, data):
-        return any([key not in {'sort_by', 'page'} for key in data.keys()])
+        return any([key not in {"sort_by", "page"} for key in data.keys()])
 
     def get_summary_message(self):
         """Return message displayed in dashboard filter cards.
@@ -22,8 +22,4 @@ class SortedFilterSet(FilterSet):
         Inherited by subclasses for record specific naming.
         """
         counter = self.qs.count()
-        return npgettext(
-            'Number of matching records in the dashboard list',
-            'Found %(counter)d matching record',
-            'Found %(counter)d matching records',
-            number=counter) % {'counter': counter}
+        return f"Found {counter} matching record{pluralize(counter)}"

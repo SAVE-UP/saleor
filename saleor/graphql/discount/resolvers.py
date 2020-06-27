@@ -1,19 +1,15 @@
-import graphene_django_optimizer as gql_optimizer
-
 from ...discount import models
-from ..utils import filter_by_query_param
+from ..utils.filters import filter_by_query_param
 
-VOUCHER_SEARCH_FIELDS = ('name', 'code',)
-SALE_SEARCH_FIELDS = ('name', 'value', 'type')
+VOUCHER_SEARCH_FIELDS = ("name", "code")
+SALE_SEARCH_FIELDS = ("name", "value", "type")
 
 
-def resolve_vouchers(info, query):
+def resolve_vouchers(info, query, **_kwargs):
     qs = models.Voucher.objects.all()
-    qs = filter_by_query_param(qs, query, VOUCHER_SEARCH_FIELDS)
-    return gql_optimizer.query(qs, info)
+    return filter_by_query_param(qs, query, VOUCHER_SEARCH_FIELDS)
 
 
-def resolve_sales(info, query):
+def resolve_sales(info, query, **_kwargs):
     qs = models.Sale.objects.all()
-    qs = filter_by_query_param(qs, query, SALE_SEARCH_FIELDS)
-    return gql_optimizer.query(qs, info)
+    return filter_by_query_param(qs, query, SALE_SEARCH_FIELDS)

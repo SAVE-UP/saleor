@@ -1,29 +1,38 @@
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, List, Set, Union
+
 from django.conf import settings
-from django.utils.translation import pgettext_lazy
+
+if TYPE_CHECKING:
+    # flake8: noqa
+    from .models import Sale, Voucher
 
 
 class DiscountValueType:
-    FIXED = 'fixed'
-    PERCENTAGE = 'percentage'
+    FIXED = "fixed"
+    PERCENTAGE = "percentage"
 
     CHOICES = [
-        (FIXED, pgettext_lazy(
-            'Discount type', settings.DEFAULT_CURRENCY)),
-        (PERCENTAGE, pgettext_lazy('Discount type', '%'))]
+        (FIXED, settings.DEFAULT_CURRENCY),
+        (PERCENTAGE, "%"),
+    ]
 
 
 class VoucherType:
-    PRODUCT = 'product'
-    COLLECTION = 'collection'
-    CATEGORY = 'category'
-    SHIPPING = 'shipping'
-    VALUE = 'value'
+    SHIPPING = "shipping"
+    ENTIRE_ORDER = "entire_order"
+    SPECIFIC_PRODUCT = "specific_product"
 
     CHOICES = [
-        (VALUE, pgettext_lazy('Voucher: discount for', 'All products')),
-        (PRODUCT, pgettext_lazy('Voucher: discount for', 'Specific products')),
-        (COLLECTION, pgettext_lazy(
-            'Voucher: discount for', 'Specific collections of products')),
-        (CATEGORY, pgettext_lazy(
-            'Voucher: discount for', 'Specific categories of products')),
-        (SHIPPING, pgettext_lazy('Voucher: discount for', 'Shipping'))]
+        (ENTIRE_ORDER, "Entire order"),
+        (SHIPPING, "Shipping"),
+        (SPECIFIC_PRODUCT, "Specific products, collections and categories"),
+    ]
+
+
+@dataclass
+class DiscountInfo:
+    sale: Union["Sale", "Voucher"]
+    product_ids: Union[List[int], Set[int]]
+    category_ids: Union[List[int], Set[int]]
+    collection_ids: Union[List[int], Set[int]]

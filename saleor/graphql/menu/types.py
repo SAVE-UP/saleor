@@ -1,53 +1,64 @@
-from textwrap import dedent
-
 import graphene
-import graphene_django_optimizer as gql_optimizer
-from django.db.models import Prefetch
 from graphene import relay
 
 from ...menu import models
 from ..core.connection import CountableDjangoObjectType
-
-
-def prefetch_menus(info, *args, **kwargs):
-    qs = models.MenuItem.objects.filter(level=0)
-    return Prefetch(
-        'items', queryset=gql_optimizer.query(qs, info),
-        to_attr='prefetched_items')
+from ..translations.fields import TranslationField
+from ..translations.types import MenuItemTranslation
 
 
 class Menu(CountableDjangoObjectType):
-    children = graphene.List(
-        lambda: MenuItem, required=True,
-        description='List of menu item children items')
-    items = gql_optimizer.field(
-        graphene.List(lambda: MenuItem),
-        prefetch_related=prefetch_menus)
+    items = graphene.List(lambda: MenuItem)
 
     class Meta:
-        description = dedent("""Represents a single menu - an object that is used
-        to help navigate through the store.""")
+        description = (
+            "Represents a single menu - an object that is used to help navigate "
+            "through the store."
+        )
         interfaces = [relay.Node]
-        exclude_fields = ['json_content']
+        only_fields = ["id", "name"]
         model = models.Menu
 
-    def resolve_items(self, info, **kwargs):
-        if hasattr(self, 'prefetched_items'):
-            return self.prefetched_items
-        return self.items.filter(level=0)
+    @staticmethod
+    def resolve_items(root: models.Menu, _info, **_kwargs):
+        if hasattr(root, "prefetched_items"):
+            return root.prefetched_items  # type: ignore
+        return root.items.filter(level=0)
 
 
 class MenuItem(CountableDjangoObjectType):
-    children = gql_optimizer.field(
-        graphene.List(lambda: MenuItem), model_field='children')
-    url = graphene.String(description='URL to the menu item.')
+    children = graphene.List(lambda: MenuItem)
+    url = graphene.String(description="URL to the menu item.")
+    translation = TranslationField(MenuItemTranslation, type_name="menu item")
 
     class Meta:
-        description = dedent("""Represents a single item of the related menu.
-        Can store categories, collection or pages.""")
+        description = (
+            "Represents a single item of the related menu. Can store categories, "
+            "collection or pages."
+        )
         interfaces = [relay.Node]
-        exclude_fields = ['sort_order', 'lft', 'rght', 'tree_id']
+        only_fields = [
+            "category",
+            "collection",
+            "id",
+            "level",
+            "menu",
+            "name",
+            "page",
+            "parent",
+        ]
         model = models.MenuItem
 
-    def resolve_children(self, info, **kwargs):
-        return self.children.all()
+    @staticmethod
+    def resolve_children(root: models.MenuItem, _info, **_kwargs):
+        return root.children.all()
+
+
+class MenuItemMoveInput(graphene.InputObjectType):
+    item_id = graphene.ID(description="The menu item ID to move.", required=True)
+    parent_id = graphene.ID(
+        description="ID of the parent menu. If empty, menu will be top level menu."
+    )
+    sort_order = graphene.Int(
+        description="Sorting position of the menu item (from 0 to x)."
+    )
